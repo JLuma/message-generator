@@ -1,5 +1,5 @@
 # Simple Kafka message generator
-# Usage example:
+# Usage example
 ### Minimal configuration  
 java -Dkafka.bootstrap.servers=localhost:9092 -Dkafka.topic=pes -jar kafka-message-generator.jar  
 ### Full configuration  
