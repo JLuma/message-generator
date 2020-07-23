@@ -32,7 +32,6 @@
     </dependencies>
 
     <build>
-        <finalName>kafka-message-generator</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -61,6 +60,8 @@
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>
                     </descriptorRefs>
+                    <appendAssemblyId>false</appendAssemblyId>
+                    <finalName>kafka-message-generator</finalName>
                 </configuration>
             </plugin>
         </plugins>
