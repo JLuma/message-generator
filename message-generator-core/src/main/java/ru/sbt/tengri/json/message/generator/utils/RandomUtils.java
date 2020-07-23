@@ -1,9 +1,9 @@
-package ru.sbt.tengri.json.message.generator.text;
+package ru.sbt.tengri.json.message.generator.utils;
 
 import java.util.List;
 import java.util.Random;
 
-public class RandomUtils {
+public final class RandomUtils {
 
   private final Random rnd = new Random();
 

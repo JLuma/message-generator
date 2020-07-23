@@ -1,4 +1,4 @@
-package ru.sbt.tengri.json.message.generator.text;
+package ru.sbt.tengri.json.message.generator.utils;
 
 public class Range {
 
@@ -15,6 +15,10 @@ public class Range {
             throw new IllegalArgumentException(String.format("Max [%s] value must be more than min [%s]", max, min));
         }
         return new Range(min, max);
+    }
+
+    public static Range ofMax(int max) {
+        return Range.of(0, max);
     }
 
     public int getMin() {

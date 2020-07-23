@@ -1,7 +1,7 @@
 package ru.sbt.tengri.json.message.generator.text.word;
 
 import org.apache.commons.lang3.RandomStringUtils;
-import ru.sbt.tengri.json.message.generator.text.Range;
+import ru.sbt.tengri.json.message.generator.utils.Range;
 
 public class RandomWordGenerator implements WordGenerator {
 
