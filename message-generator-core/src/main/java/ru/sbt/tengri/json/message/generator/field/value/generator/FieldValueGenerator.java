@@ -10,7 +10,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
     @JsonSubTypes.Type(value = IntValueGenerator.class, name = IntValueGenerator.RANDOM_INT_GENERATOR_JSON_TYPE),
     @JsonSubTypes.Type(value = StringValueGenerator.class, name = StringValueGenerator.RANDOM_STRING_GENERATOR_JSON_TYPE),
     @JsonSubTypes.Type(value = RandomTextGenerator.class, name = RandomTextGenerator.RANDOM_TEXT_GENERATOR_JSON_TYPE),
-    @JsonSubTypes.Type(value = VocabularyTextGenerator.class, name = VocabularyTextGenerator.VOCABULARY_TEXT_GENERATOR_JSON_TYPE)
+    @JsonSubTypes.Type(value = VocabularyTextGenerator.class, name = VocabularyTextGenerator.VOCABULARY_TEXT_GENERATOR_JSON_TYPE),
+    @JsonSubTypes.Type(value = IncrementingTimeFieldGenerator.class, name = IncrementingTimeFieldGenerator.INCREMENTING_TIME_FIELD_GENERATOR_JSON_TYPE)
 })
 public interface FieldValueGenerator<T> {
     T generateValue();

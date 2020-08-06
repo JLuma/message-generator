@@ -1,5 +1,7 @@
 package ru.sbt.tengri.json.message.generator.utils;
 
+import java.util.function.Function;
+
 public final class ConfigUtils {
 
   private ConfigUtils() {
@@ -7,7 +9,11 @@ public final class ConfigUtils {
   }
 
   public static <T> T getDefaultIfNull(T value, T defaultValue) {
-    return value == null ? defaultValue : value;
+    return getDefaultIfNullWithCast(value, Function.identity(), defaultValue);
+  }
+
+  public static <T, V> T getDefaultIfNullWithCast(V value, Function<V, T> castFn, T defaultValue) {
+    return value == null ? defaultValue : castFn.apply(value);
   }
 
 }

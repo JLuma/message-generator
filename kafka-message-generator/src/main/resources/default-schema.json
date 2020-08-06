@@ -1,4 +1,12 @@
 {
+  "time": {
+    "type": "incrementing_time",
+    "dateFormat":"yyyy-MM-dd HH:mm:ss:SSS",
+    "baseDate": "2018-02-07 00:00:00:000",
+    "dateIncrement": 30,
+    "dateIncrementDelta": 10,
+    "dateIncrementUnit": "SECONDS"
+  },
   "organization": {
     "type": "const",
     "value": "OAO PES"
