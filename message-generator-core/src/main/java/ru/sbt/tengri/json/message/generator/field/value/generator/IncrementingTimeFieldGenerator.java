@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.time.DateTimeException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -17,6 +18,7 @@ public class IncrementingTimeFieldGenerator implements FieldValueGenerator<Strin
 
   public static final String INCREMENTING_TIME_FIELD_GENERATOR_JSON_TYPE = "incrementing_time";
 
+  private final String dateFormat;
   private final DateTimeFormatter dateFormatter;
   private LocalDateTime baseDate;
 
@@ -35,6 +37,7 @@ public class IncrementingTimeFieldGenerator implements FieldValueGenerator<Strin
       @JsonProperty("dateIncrementDelta") int dateIncrementDelta,
       @JsonProperty("dateIncrementUnit") String dateIncrementUnit) {
 
+    this.dateFormat = dateFormat;
     this.dateFormatter = ConfigUtils.getDefaultIfNullWithCast(
         dateFormat,
         this::createDateFormatter,
@@ -67,7 +70,13 @@ public class IncrementingTimeFieldGenerator implements FieldValueGenerator<Strin
     }
 
     this.baseDate = targetDate;
-    return targetDate.format(dateFormatter);
+    try {
+      return targetDate.format(dateFormatter);
+    } catch (DateTimeException ex) {
+      throw new IllegalArgumentException(
+          String.format("Cannot format date [%s] to format [%s]. Invalid format?", targetDate, dateFormat),
+          ex);
+    }
   }
 
   private ChronoUnit parseChronoUnit(String timeUnit) {
