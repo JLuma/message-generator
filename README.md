@@ -16,6 +16,13 @@ java -Dsample-mode=true -Dmessage.schema.file.path=./my-schema.json -jar kafka-m
 ### Default message schema  
 ```
 {
+  "time": {
+    "type": "incrementing_time",
+    "dateFormat":"yyyy-MM-dd'T'HH:mm:ss.SSS",
+    "dateIncrement": 30,
+    "dateIncrementDelta": 10,
+    "dateIncrementUnit": "SECONDS"
+  },
   "organization": {
     "type": "const",
     "value": "OAO PES"
@@ -55,4 +62,5 @@ java -Dsample-mode=true -Dmessage.schema.file.path=./my-schema.json -jar kafka-m
     "maxTextWordsAmount": 15
   }
 }
+
 ```
