@@ -1,6 +1,5 @@
 package ru.sbt.tengri.kafka.message.generator;
 
-import java.net.URI;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -10,6 +9,7 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ru.sbt.tengri.kafka.message.generator.proxy.MessageGeneratorProxyFactory;
 
 public class KafkaMessageGenerator {
 
@@ -19,12 +19,14 @@ public class KafkaMessageGenerator {
   private final String topic;
   private final long messagesAmount;
   private final String bootstrapServers;
+  private final MessageGeneratorProxyFactory messageGeneratorProxyFactory;
 
-  public KafkaMessageGenerator() {
-    this.threads = ConfigurationUtils.getThreadsNumberProperty();
-    this.topic = ConfigurationUtils.getTargetTopicProperty();
-    this.messagesAmount = ConfigurationUtils.getMessagesNumberProperty();
-    this.bootstrapServers = ConfigurationUtils.getKafkaServersProperty();
+  public KafkaMessageGenerator(Configuration conf, MessageGeneratorProxyFactory messageGeneratorProxyFactory) {
+    this.threads = conf.getThreadsNumberProperty();
+    this.topic = conf.getTargetTopicProperty();
+    this.messagesAmount = conf.getMessagesNumberProperty();
+    this.bootstrapServers = conf.getKafkaServersProperty();
+    this.messageGeneratorProxyFactory = messageGeneratorProxyFactory;
 
     LOG.info("Starting with configuration:\n" +
                  "Topic [{}]\n" +
@@ -45,8 +47,7 @@ public class KafkaMessageGenerator {
         messagesPerThread,
         residualMessages);
 
-    final URI messageSchemaFileUri = ConfigurationUtils.getMessageSchemaFileUri();
-    sendToKafka(es, cd, messagesPerThread, residualMessages, messageSchemaFileUri);
+    sendToKafka(es, cd, messagesPerThread, residualMessages, messageGeneratorProxyFactory);
 
     LOG.info("Execution time {} (ms)", (System.currentTimeMillis() - startTime));
     es.shutdown();
@@ -57,13 +58,13 @@ public class KafkaMessageGenerator {
       CountDownLatch cd,
       long messagesPerThread,
       long residualMessages,
-      URI messageSchemaFileUri) throws InterruptedException {
+      MessageGeneratorProxyFactory messageGeneratorProxyFactory) throws InterruptedException {
 
     try (KafkaProducer<String, String> producer = createKafkaProducer()) {
       for (int i = 0; i < threads - 1; i++) {
-        es.submit(new WriteMessagesTask(cd, producer, topic, messagesPerThread, messageSchemaFileUri));
+        es.submit(new WriteMessagesTask(cd, producer, topic, messagesPerThread, messageGeneratorProxyFactory));
       }
-      es.submit(new WriteMessagesTask(cd, producer, topic, messagesPerThread + residualMessages, messageSchemaFileUri));
+      es.submit(new WriteMessagesTask(cd, producer, topic, messagesPerThread + residualMessages, messageGeneratorProxyFactory));
       cd.await();
     }
   }
