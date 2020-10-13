@@ -33,6 +33,10 @@ public final class ConfigurationUtils {
         return getPathOrEmpty("message.schema.file.path").map(Path::toUri).orElseGet(ConfigurationUtils::getDefaultSchemaUri);
     }
 
+    public static long getThrottlingDelay() {
+        return getLongPropertyOrDefault("throttling.delay.millis", 0);
+    }
+
     private static String getMandatoryProperty(String propertyName) {
         String propertyValue = System.getProperty(propertyName);
         if (propertyValue == null) {
