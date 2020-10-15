@@ -24,6 +24,9 @@ public final class Configuration {
     public String getTargetTopicProperty() {
         return getMandatoryProperty("kafka.topic");
     }
+    public long getThrottlingDelay() {
+        return getLongPropertyOrDefault("throttling.delay.millis", 0);
+    }
 
     public String getKafkaServersProperty() {
         return getMandatoryProperty("kafka.bootstrap.servers");

@@ -18,6 +18,7 @@ public class KafkaMessageGenerator {
   private final int threads;
   private final String topic;
   private final long messagesAmount;
+  private final long throttlingDelay;
   private final String bootstrapServers;
   private final MessageGeneratorProxyFactory messageGeneratorProxyFactory;
 
@@ -26,13 +27,15 @@ public class KafkaMessageGenerator {
     this.topic = conf.getTargetTopicProperty();
     this.messagesAmount = conf.getMessagesNumberProperty();
     this.bootstrapServers = conf.getKafkaServersProperty();
+    this.throttlingDelay = conf.getThrottlingDelay();
     this.messageGeneratorProxyFactory = messageGeneratorProxyFactory;
 
     LOG.info("Starting with configuration:\n" +
                  "Topic [{}]\n" +
                  "Bootstrap servers [{}]\n" +
                  "Messages amount [{}]\n" +
-                 "Threads [{}]\n", topic, bootstrapServers, messagesAmount, threads);
+                 "Throttling delay [{}]\n" +
+                 "Threads [{}]\n", topic, bootstrapServers, messagesAmount, throttlingDelay, threads);
   }
 
   public void generateMessages() throws InterruptedException {
@@ -62,9 +65,11 @@ public class KafkaMessageGenerator {
 
     try (KafkaProducer<String, String> producer = createKafkaProducer()) {
       for (int i = 0; i < threads - 1; i++) {
-        es.submit(new WriteMessagesTask(cd, producer, topic, messagesPerThread, messageGeneratorProxyFactory));
+        es.submit(new WriteMessagesTask(cd, producer, topic, throttlingDelay, messagesPerThread,
+                                        messageGeneratorProxyFactory));
       }
-      es.submit(new WriteMessagesTask(cd, producer, topic, messagesPerThread + residualMessages, messageGeneratorProxyFactory));
+      es.submit(new WriteMessagesTask(cd, producer, topic, throttlingDelay, messagesPerThread + residualMessages,
+                                      messageGeneratorProxyFactory));
       cd.await();
     }
   }
