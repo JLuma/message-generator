@@ -11,7 +11,7 @@
     "value": "OAO PES"
   },
   "id": {
-    "type": "random_int"
+    "type": "random_uuid"
   },
   "personnel number": {
     "type": "random_int",
