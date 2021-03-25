@@ -76,5 +76,34 @@ In this mode content for every message will be generated according to message ge
     "maxTextWordsAmount": 15
   }
 }
-
 ```
+### Another simple dynamic message schema example
+```
+{
+  "time": {
+    "type": "incrementing_time"
+  },
+  "organization": {
+    "type": "const",
+    "value": "Dog"
+  },
+  "id": {
+    "type": "random_int"
+  },
+  "name": {
+    "type": "vocabulary",
+    "vocabulary": ["Pes", "Peska", "Pesinessa", "Pesiel", "Psinka"]
+  },
+  "login": {
+    "type": "random_string"
+  },
+  "characteristic": {
+    "type": "vocabulary_text",
+    "vocabulary": ["smart", "nice", "toxic", "angry", "good boy", "kind", "really pes"]
+  },
+  "about self": {
+    "type": "random_text"
+  }
+}
+```
+
