@@ -2,20 +2,18 @@
 # Usage example
 java -Dconfig.file=./config.properties -jar kafka-message-generator.jar
 
-# Configuration
-config.properties
-```
-sample-mode=true - enable/disable sample mode
-kafka.topic=sample-topic - kafka topic to write messages
-kafka.bootstrap.servers=broker:9092 - kafka brokers
-message.gen.mode=SCHEMA_BASED - message generation mode; allowable values: SCHEMA_BASED, CONSTANT_FILE
-message.gen.constant-file.message-file-path= - File with static constant message (Only for CONSTANT_FILE generation mode)
-#message.gen.schema-based.schema-file-path= - File with dynamic message schema (Only for SCHEMA_BASED generation mode)
-
-#kafka.send.throttling.delay.millis=0 - Delay in millis between sending messages to kafka
-#kafka.messages.amount=10 - Total messages number to be sent
-#kafka.threads= - Number of threads to be used to send messages to Kafka
-```
+# Configuration (config.properties)
+Property name | Allowable values/type | Description | Default value
+--- | --- | --- | ---
+sample-mode | boolean | Enable/Disable sample mode (Described in detail below) | false
+message.gen.mode | SCHEMA_BASED, CONSTANT_FILE | Message generation mode | SCHEMA_BASED
+message.gen.constant-file.message-file-path | String | Path to file, which be used as constant/static message (Works with message generation mode CONSTANT_FILE only)  | -
+message.gen.schema-based.schema-file-path | String | Path to file, which be used as dynamic message schema (Works with message generation mode SCHEMA_BASED only) | Default schema described below
+kafka.topic | String | Kafka topic to write messages | -
+kafka.bootstrap.servers | String | Comma separated kafka brokers list | -
+kafka.send.throttling.delay.millis | Integer | Delay in millis between sending messages to kafka | 0
+kafka.messages.amount | Integer | Total messages number to be sent | 10
+kafka.threads | Integer | Number of threads to be used to send messages to Kafka | Runtime.getRuntime().availableProcessors()
 
 ## Sample mode
 In sample mode messages will not send to Kafka, but one example message will prints to console and writes to disk instead.  
@@ -29,7 +27,7 @@ In this mode same file (static) content will be used as message to send to Kafka
 In this mode content for every message will be generated according to message generation schema
 
 # Message generation schema
-### Default message schema  
+### Default dynamic message schema  
 ```
 {
   "time": {
