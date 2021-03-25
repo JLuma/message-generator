@@ -1,16 +1,32 @@
 # Simple Kafka message generator
 # Usage example
-### Minimal configuration  
-java -Dkafka.bootstrap.servers=localhost:9092 -Dkafka.topic=pes -jar kafka-message-generator.jar  
-### Full configuration  
-java -Dkafka.bootstrap.servers=localhost:9092 -Dkafka.topic=pes -Dkafka.messages.amount=100 -Dkafka.threads=8 -Dmessage.schema.file.path=./my-schema.json -jar kafka-message-generator.jar
+java -Dconfig.file=./config.properties -jar kafka-message-generator.jar
 
-# Sample mode
+# Configuration
+config.properties
+```
+sample-mode=true - enable/disable sample mode
+kafka.topic=sample-topic - kafka topic to write messages
+kafka.bootstrap.servers=broker:9092 - kafka brokers
+message.gen.mode=SCHEMA_BASED - message generation mode; allowable values: SCHEMA_BASED, CONSTANT_FILE
+message.gen.constant-file.message-file-path= - File with static constant message (Only for CONSTANT_FILE generation mode)
+#message.gen.schema-based.schema-file-path= - File with dynamic message schema (Only for SCHEMA_BASED generation mode)
+
+#kafka.send.throttling.delay.millis=0 - Delay in millis between sending messages to kafka
+#kafka.messages.amount=10 - Total messages number to be sent
+#kafka.threads= - Number of threads to be used to send messages to Kafka
+```
+
+## Sample mode
 In sample mode messages will not send to Kafka, but one example message will prints to console and writes to disk instead.  
 It's may be useful in situations when you want to validate what messages will be generated with specified schema file.  
-### Sample mode activation
-java -Dsample-mode=true -jar kafka-message-generator.jar (default schema)  
-java -Dsample-mode=true -Dmessage.schema.file.path=./my-schema.json -jar kafka-message-generator.jar (custom schema)  
+
+## Message generation modes
+### Constant file
+In this mode same file (static) content will be used as message to send to Kafka
+
+### Schema based
+In this mode content for every message will be generated according to message generation schema
 
 # Message generation schema
 ### Default message schema  
