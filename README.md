@@ -1,19 +1,33 @@
 # Simple Kafka message generator
 # Usage example
-### Minimal configuration  
-java -Dkafka.bootstrap.servers=localhost:9092 -Dkafka.topic=pes -jar kafka-message-generator.jar  
-### Full configuration  
-java -Dkafka.bootstrap.servers=localhost:9092 -Dkafka.topic=pes -Dkafka.messages.amount=100 -Dkafka.threads=8 -Dmessage.schema.file.path=./my-schema.json -jar kafka-message-generator.jar
+java -Dconfig.file=./config.properties -jar kafka-message-generator.jar
 
-# Sample mode
+# Configuration (config.properties)
+Property name | Allowable values/type | Description | Default value
+--- | --- | --- | ---
+sample-mode | boolean | Enable/Disable sample mode (Described in detail below) | false
+message.gen.mode | SCHEMA_BASED, CONSTANT_FILE | Message generation mode | SCHEMA_BASED
+message.gen.constant-file.message-file-path | String | Path to file, which be used as constant/static message (Works with message generation mode CONSTANT_FILE only)  | -
+message.gen.schema-based.schema-file-path | String | Path to file, which be used as dynamic message schema (Works with message generation mode SCHEMA_BASED only) | Default schema described below
+kafka.topic | String | Kafka topic to write messages | -
+kafka.bootstrap.servers | String | Comma separated kafka brokers list | -
+kafka.send.throttling.delay.millis | Integer | Delay in millis between sending messages to kafka | 0
+kafka.messages.amount | Integer | Total messages number to be sent | 10
+kafka.threads | Integer | Number of threads to be used to send messages to Kafka | Runtime.getRuntime().availableProcessors()
+
+## Sample mode
 In sample mode messages will not send to Kafka, but one example message will prints to console and writes to disk instead.  
 It's may be useful in situations when you want to validate what messages will be generated with specified schema file.  
-### Sample mode activation
-java -Dsample-mode=true -jar kafka-message-generator.jar (default schema)  
-java -Dsample-mode=true -Dmessage.schema.file.path=./my-schema.json -jar kafka-message-generator.jar (custom schema)  
+
+## Message generation modes
+### Constant file
+In this mode same file (static) content will be used as message to send to Kafka
+
+### Schema based
+In this mode content for every message will be generated according to message generation schema
 
 # Message generation schema
-### Default message schema  
+### Default dynamic message schema  
 ```
 {
   "time": {
