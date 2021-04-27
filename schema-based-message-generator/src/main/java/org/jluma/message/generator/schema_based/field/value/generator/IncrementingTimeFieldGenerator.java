@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.DateTimeException;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
@@ -17,9 +18,9 @@ import org.jluma.message.generator.schema_based.utils.Range;
 public class IncrementingTimeFieldGenerator implements FieldValueGenerator<String> {
 
   public static final String INCREMENTING_TIME_FIELD_GENERATOR_JSON_TYPE = "incrementing_time";
+  private static final String UNIX_TIMESTAMP_MILLIS_TIME_FORMAT = "unix_millis";
 
-  private final String dateFormat;
-  private final DateTimeFormatter dateFormatter;
+  private final DateConverter dateConverter;
   private LocalDateTime baseDate;
 
   private final int dateIncrement;
@@ -33,19 +34,23 @@ public class IncrementingTimeFieldGenerator implements FieldValueGenerator<Strin
   public IncrementingTimeFieldGenerator(
       @JsonProperty("dateFormat") String dateFormat,
       @JsonProperty("baseDate") String baseDate,
-      @JsonProperty("dateIncrement") int dateIncrement,
-      @JsonProperty("dateIncrementDelta") int dateIncrementDelta,
+      @JsonProperty("dateIncrement") Integer dateIncrement,
+      @JsonProperty("dateIncrementDelta") Integer dateIncrementDelta,
       @JsonProperty("dateIncrementUnit") String dateIncrementUnit) {
 
-    this.dateFormat = dateFormat;
-    this.dateFormatter = ConfigUtils.getDefaultIfNullWithCast(
-        dateFormat,
-        this::createDateFormatter,
-        ConfigDefaults.DEFAULT_DATE_FORMATTER);
+    if (UNIX_TIMESTAMP_MILLIS_TIME_FORMAT.equals(dateFormat)) {
+      this.dateConverter = new UnixMillisDateConverter();
+    } else {
+      this.dateConverter = new IsoDateConverter(
+          ConfigUtils.getDefaultIfNullWithCast(
+            dateFormat,
+            this::createDateFormatter,
+            ConfigDefaults.DEFAULT_DATE_FORMATTER));
+    }
 
     this.baseDate = ConfigUtils.getDefaultIfNullWithCast(
         baseDate,
-        dateAsString -> LocalDateTime.parse(dateAsString, this.dateFormatter),
+        dateAsString -> LocalDateTime.parse(dateAsString, DateTimeFormatter.ISO_LOCAL_DATE_TIME),
         ConfigDefaults.DEFAULT_BASE_DATE);
 
     this.dateIncrement = ConfigUtils.getDefaultIfNull(dateIncrement, ConfigDefaults.DEFAULT_DATE_INCREMENT);
@@ -70,13 +75,7 @@ public class IncrementingTimeFieldGenerator implements FieldValueGenerator<Strin
     }
 
     this.baseDate = targetDate;
-    try {
-      return targetDate.format(dateFormatter);
-    } catch (DateTimeException ex) {
-      throw new IllegalArgumentException(
-          String.format("Cannot format date [%s] to format [%s]. Invalid format?", targetDate, dateFormat),
-          ex);
-    }
+    return dateConverter.convertDate(targetDate);
   }
 
   private ChronoUnit parseChronoUnit(String timeUnit) {
@@ -106,6 +105,40 @@ public class IncrementingTimeFieldGenerator implements FieldValueGenerator<Strin
     private static final int DEFAULT_DATE_INCREMENT = 100;
     private static final int DEFAULT_DATE_INCREMENT_DELTA = 15;
     private static final ChronoUnit DEFAULT_DATE_INCREMENT_UNIT = ChronoUnit.MILLIS;
+
+  }
+
+  private interface DateConverter {
+    String convertDate(LocalDateTime time);
+  }
+
+  private static class UnixMillisDateConverter implements DateConverter {
+
+    @Override
+    public String convertDate(LocalDateTime time) {
+      return "" + time.toInstant(ZoneOffset.UTC).toEpochMilli();
+    }
+
+  }
+
+  private static class IsoDateConverter implements DateConverter {
+
+    private final DateTimeFormatter formatter;
+
+    public IsoDateConverter(DateTimeFormatter formatter) {
+      this.formatter = formatter;
+    }
+
+    @Override
+    public String convertDate(LocalDateTime time) {
+      try {
+        return time.format(formatter);
+      } catch (DateTimeException ex) {
+        throw new IllegalArgumentException(
+            String.format("Cannot format date [%s] to format [%s]. Invalid format?", time, formatter),
+            ex);
+      }
+    }
 
   }
 
