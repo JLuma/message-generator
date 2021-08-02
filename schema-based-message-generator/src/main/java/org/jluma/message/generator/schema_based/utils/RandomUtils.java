@@ -7,11 +7,23 @@ public final class RandomUtils {
 
   private final Random rnd = new Random();
 
-  public int genRandomValueAtRange(Range range) {
+  public int genRandomIntegerValueAtRange(Range<Integer> range) {
     if (range.getMin() == range.getMax()) {
       return range.getMin();
     } else {
       return range.getMin() + rnd.nextInt(range.getMax() - range.getMin() + 1);
+    }
+  }
+
+  public boolean getRandomBooleanValue() {
+    return rnd.nextBoolean();
+  }
+
+  public double getRandomDoubleValue(Range<Double> range) {
+    if (range.getMin() == range.getMax()) {
+      return range.getMin();
+    } else {
+      return range.getMin() + rnd.nextDouble() * (range.getMax() - range.getMin());
     }
   }
 

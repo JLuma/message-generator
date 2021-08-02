@@ -5,9 +5,9 @@ import org.jluma.message.generator.schema_based.utils.Range;
 
 public class RandomWordGenerator implements WordGenerator {
 
-  private final Range wordLengthRange;
+  private final Range<Integer> wordLengthRange;
 
-  public RandomWordGenerator(Range wordLengthRange) {
+  public RandomWordGenerator(Range<Integer> wordLengthRange) {
     this.wordLengthRange = wordLengthRange;
   }
 

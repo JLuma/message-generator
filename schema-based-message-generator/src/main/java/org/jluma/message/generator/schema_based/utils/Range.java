@@ -1,32 +1,39 @@
 package org.jluma.message.generator.schema_based.utils;
 
-public class Range {
+public class Range<T> {
 
-    private final int min;
-    private final int max;
+  private final T min;
+  private final T max;
 
-    private Range(int min, int max) {
-        this.min = min;
-        this.max = max;
+  private Range(T min, T max) {
+    this.min = min;
+    this.max = max;
+  }
+
+  public static Range<Integer> of(int min, int max) {
+    if (max < min) {
+      throw new IllegalArgumentException(String.format("Max [%s] value must be more than min [%s]", max, min));
     }
+    return new Range<>(min, max);
+  }
 
-    public static Range of(int min, int max) {
-        if (max < min) {
-            throw new IllegalArgumentException(String.format("Max [%s] value must be more than min [%s]", max, min));
-        }
-        return new Range(min, max);
+  public static Range<Double> of(double min, double max) {
+    if (max < min) {
+      throw new IllegalArgumentException(String.format("Max [%s] value must be more than min [%s]", max, min));
     }
+    return new Range<>(min, max);
+  }
 
-    public static Range ofMax(int max) {
-        return Range.of(0, max);
-    }
+  public static Range<Integer> ofMax(int max) {
+    return Range.of(0, max);
+  }
 
-    public int getMin() {
-        return min;
-    }
+  public T getMin() {
+    return min;
+  }
 
-    public int getMax() {
-        return max;
-    }
+  public T getMax() {
+    return max;
+  }
 
 }

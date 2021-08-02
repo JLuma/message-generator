@@ -67,7 +67,7 @@ public class IncrementingTimeFieldGenerator implements FieldValueGenerator<Strin
     LocalDateTime targetDate = baseDate;
 
     if (dateIncrement != 0) {
-      int targetDateIncrement = randomUtils.genRandomValueAtRange(Range.of(
+      int targetDateIncrement = randomUtils.genRandomIntegerValueAtRange(Range.of(
           dateIncrement - dateIncrementDelta,
           dateIncrement + dateIncrementDelta));
 

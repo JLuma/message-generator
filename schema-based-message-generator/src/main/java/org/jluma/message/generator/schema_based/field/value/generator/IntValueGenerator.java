@@ -28,7 +28,7 @@ public class IntValueGenerator implements FieldValueGenerator<Integer> {
 
     @Override
     public Integer generateValue() {
-        return randomUtils.genRandomValueAtRange(Range.of(minValueBound, maxValueBound));
+        return randomUtils.genRandomIntegerValueAtRange(Range.of(minValueBound, maxValueBound));
     }
 
     private static class ConfigDefaults {
