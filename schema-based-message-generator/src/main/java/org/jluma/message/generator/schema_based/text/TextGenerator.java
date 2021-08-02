@@ -19,7 +19,7 @@ public class TextGenerator {
     }
 
     public String generateText() {
-        final int textLength = rndUtils.genRandomValueAtRange(textWordsAmountRange);
+        final int textLength = rndUtils.genRandomIntegerValueAtRange(textWordsAmountRange);
         final StringBuilder sb = new StringBuilder();
         for (int i = 0; i < textLength; i++) {
             final String word = wordGenerator.generateWord();
