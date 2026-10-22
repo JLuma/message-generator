@@ -1,37 +1,22 @@
-# ===================================================================
-# Message Generator Application Configuration
-# ===================================================================
+flow:
+  thread-mode: single
+  messages-amount: 10
+  threads: 1
+  throttling-delay-millis: 0
 
-# Message generator settings
-message:
-  generator:
-    # Enable sample mode - generates one example message
-    sample-mode: false
-    # Message generation mode: SCHEMA_BASED or CONSTANT_FILE
-    mode: SCHEMA_BASED
-    constant-file:
-      message-file-path:
-    schema-based:
-      schema-file-path:
+generator:
+  mode: SCHEMA_BASED
+  constant-file:
+    message-file-path:
+  schema-based:
+    schema-file-path:
 
-# Kafka settings
-spring:
-  kafka:
-    producer:
-      bootstrap-servers: localhost:9092
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+sender:
+  type: file
 
-kafka:
-  topic: messages
-  bootstrap-servers: localhost:9092
-  messages:
-    amount: 10
-  send:
-    throttling:
-      delay:
-        millis: 0
-  threads: 4
-  client-id: KafkaMessageGenerator
-
-# ===================================================================
+#spring:
+#  kafka:
+#    producer:
+#      bootstrap-servers: localhost:9092
+#      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+#      value-serializer: org.apache.kafka.common.serialization.StringSerializer
