@@ -10,6 +10,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.jluma.tools.loadtesting.syntheticdatagenerator.api.MessageGenerationException;
 import org.jluma.tools.loadtesting.syntheticdatagenerator.api.MessageGenerator;
 import org.jluma.tools.loadtesting.syntheticdatagenerator.api.MessageGeneratorInitializationException;
+import org.jluma.tools.loadtesting.syntheticdatagenerator.writer.api.MessageWriter;
 import org.jluma.tools.loadtesting.syntheticdatagenerator.writer.kafka.KafkaMessageWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,9 +56,11 @@ public class Myan {
             LOG.info("Running in sample mode");
             writeSample(messageGenerator);
         } else {
-            KafkaMessageWriter kafkaMessageWriter = new KafkaMessageWriter(conf, messageGenerator);
-            kafkaMessageWriter.addKafkaProducerAdditionalProperties(getKafkaProducerAdditionalProperties());
-            kafkaMessageWriter.writeMessages();
+            MessageWriter messageWriter = constructMessageWriter();
+            if (messageWriter instanceof KafkaMessageWriter kafkaWriter) {
+                kafkaWriter.addKafkaProducerAdditionalProperties(getKafkaProducerAdditionalProperties());
+            }
+            messageWriter.writeMessages(messageGenerator);
         }
     }
 
@@ -71,6 +74,17 @@ public class Myan {
             default:
                 throw new IllegalArgumentException(
                         String.format("This method doesn't not support this message generation mode [%s]", mode));
+        }
+    }
+
+    private MessageWriter constructMessageWriter() {
+        Configuration.MessageTypeWriterType mode = conf.getMessageWriterType();
+        switch (mode) {
+            case KAFKA:
+                return new KafkaMessageWriter(conf);
+            default:
+                throw new IllegalArgumentException(
+                        String.format("This method doesn't not support this message writer type [%s]", mode));
         }
     }
 

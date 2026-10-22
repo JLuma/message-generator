@@ -65,6 +65,14 @@ public final class Configuration {
                 String.format("one of [%s]", Arrays.asList(MessageGeneratorType.values())));
     }
 
+    public MessageTypeWriterType getMessageWriterType() {
+        return this.getPropertyOrDefault(
+                "message.writer.type",
+                MessageTypeWriterType::valueOf,
+                MessageTypeWriterType.KAFKA,
+                String.format("one of [%s]", Arrays.asList(MessageTypeWriterType.values())));
+    }
+
     private String getMandatoryProperty(String propertyName) {
         String propertyValue = props.getProperty(propertyName);
         if (propertyValue == null) {
@@ -124,6 +132,10 @@ public final class Configuration {
 
     public enum MessageGeneratorType {
         CONSTANT_FILE, SCHEMA_BASED
+    }
+
+    public enum MessageTypeWriterType {
+        KAFKA
     }
 
 }

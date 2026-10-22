@@ -9,10 +9,11 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.jluma.tools.loadtesting.syntheticdatagenerator.Configuration;
 import org.jluma.tools.loadtesting.syntheticdatagenerator.api.MessageGenerator;
+import org.jluma.tools.loadtesting.syntheticdatagenerator.writer.api.MessageWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class KafkaMessageWriter {
+public class KafkaMessageWriter implements MessageWriter {
 
   private static final Logger LOG = LoggerFactory.getLogger(KafkaMessageWriter.class);
 
@@ -21,16 +22,14 @@ public class KafkaMessageWriter {
   private final long messagesAmount;
   private final long throttlingDelay;
   private final String bootstrapServers;
-  private final MessageGenerator messageGenerator;
   private final Properties kafkaProducerAdditionalProperties = new Properties();
 
-  public KafkaMessageWriter(Configuration conf, MessageGenerator messageGenerator) {
+  public KafkaMessageWriter(Configuration conf) {
     this.threads = conf.getThreadsNumberProperty();
     this.topic = conf.getTargetTopicProperty();
     this.messagesAmount = conf.getMessagesNumberProperty();
     this.bootstrapServers = conf.getKafkaServersProperty();
     this.throttlingDelay = conf.getThrottlingDelay();
-    this.messageGenerator = messageGenerator;
 
     LOG.info("Starting with configuration:\n" +
                  "Topic [{}]\n" +
@@ -40,7 +39,7 @@ public class KafkaMessageWriter {
                  "Threads [{}]\n", topic, bootstrapServers, messagesAmount, throttlingDelay, threads);
   }
 
-  public void writeMessages() throws InterruptedException {
+  public void writeMessages(MessageGenerator messageGenerator) throws InterruptedException {
     long startTime = System.currentTimeMillis();
 
     ExecutorService es = Executors.newFixedThreadPool(threads);
