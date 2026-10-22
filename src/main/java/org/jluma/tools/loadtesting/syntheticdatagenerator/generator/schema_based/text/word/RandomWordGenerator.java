@@ -1,19 +1,21 @@
 package org.jluma.tools.loadtesting.syntheticdatagenerator.generator.schema_based.text.word;
 
-import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.text.RandomStringGenerator;
 import org.jluma.tools.loadtesting.syntheticdatagenerator.generator.schema_based.utils.Range;
 
 public class RandomWordGenerator implements WordGenerator {
 
   private final Range wordLengthRange;
+  private final RandomStringGenerator generator;
 
   public RandomWordGenerator(Range wordLengthRange) {
     this.wordLengthRange = wordLengthRange;
+    this.generator = RandomStringGenerator.builder().withinRange('a', 'z').get();
   }
 
   @Override
   public String generateWord() {
-    return RandomStringUtils.randomAlphabetic(wordLengthRange.getMin(), wordLengthRange.getMax());
+    return generator.generate(wordLengthRange.getMin(), wordLengthRange.getMax());
   }
 
 }

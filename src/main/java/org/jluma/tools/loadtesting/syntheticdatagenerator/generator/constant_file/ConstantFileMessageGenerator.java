@@ -21,6 +21,9 @@ public class ConstantFileMessageGenerator implements MessageGenerator {
 
   @Override
   public void initialize() throws MessageGeneratorInitializationException {
+    if (messageFileUri == null) {
+      throw new MessageGeneratorInitializationException("Message file URI cannot be null for CONSTANT_FILE mode");
+    }
     Path messageFilePath = Paths.get(messageFileUri);
     this.messageAsString = readMessageToString(messageFilePath);
   }

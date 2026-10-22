@@ -1,61 +1,57 @@
 package org.jluma.tools.loadtesting.syntheticdatagenerator.writer.kafka;
 
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerRecord;
-
-import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-
 import org.jluma.tools.loadtesting.syntheticdatagenerator.api.MessageGenerationException;
 import org.jluma.tools.loadtesting.syntheticdatagenerator.api.MessageGenerator;
 
+import java.util.concurrent.CountDownLatch;
+
+/**
+ * Task for writing messages to Kafka in a separate thread.
+ */
 @Slf4j
 public class WriteMessagesTask implements Runnable {
 
-    private final CountDownLatch cd;
-
-    private final KafkaProducer<String, String> producer;
-    private final String topic;
+    private final CountDownLatch latch;
+    private final KafkaWriterService kafkaWriterService;
     private final long throttlingDelay;
     private final long messagesAmount;
     private final MessageGenerator messageGenerator;
 
     public WriteMessagesTask(
-        CountDownLatch cd,
-        KafkaProducer<String, String> producer,
-        String topic,
+        CountDownLatch latch,
+        KafkaWriterService kafkaWriterService,
         long throttlingDelay,
         long messagesAmount,
         MessageGenerator messageGenerator) {
 
-        this.cd = cd;
-        this.producer = producer;
-        this.topic = topic;
+        this.latch = latch;
+        this.kafkaWriterService = kafkaWriterService;
         this.throttlingDelay = throttlingDelay;
         this.messagesAmount = messagesAmount;
         this.messageGenerator = messageGenerator;
     }
 
+    @Override
     public void run() {
         for (int i = 0; i < messagesAmount; i++, addThrottling()) {
             try {
-                producer.send(new ProducerRecord<>(topic, UUID.randomUUID().toString(), messageGenerator.generateMessage()));
-            } catch (MessageGenerationException ex) {
-                log.error("Cannot generate message", ex);
+                kafkaWriterService.writeMessage(messageGenerator);
+            } catch (Exception ex) {
+                log.error("Cannot write message", ex);
             }
         }
-        cd.countDown();
+        latch.countDown();
     }
 
-    private void addThrottling()  {
+    private void addThrottling() {
         try {
             if (throttlingDelay != 0) {
                 Thread.sleep(throttlingDelay);
             }
         } catch (InterruptedException e) {
-          throw new RuntimeException("Error while trying to add throttling");
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Error while trying to add throttling", e);
         }
     }
-
 }

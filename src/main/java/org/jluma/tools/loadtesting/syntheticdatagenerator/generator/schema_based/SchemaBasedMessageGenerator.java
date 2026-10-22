@@ -1,8 +1,8 @@
 package org.jluma.tools.loadtesting.syntheticdatagenerator.generator.schema_based;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.net.URI;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -14,16 +14,16 @@ import org.jluma.tools.loadtesting.syntheticdatagenerator.generator.schema_based
 
 public class SchemaBasedMessageGenerator implements MessageGenerator {
 
-  private final URI schemaFileUri;
+  private final Path schemaFilePath;
   private MessageSchema schema;
 
-  public SchemaBasedMessageGenerator(URI schemaFileUri) {
-    this.schemaFileUri = schemaFileUri;
+  public SchemaBasedMessageGenerator(Path schemaPath) {
+    this.schemaFilePath = schemaPath;
   }
 
   @Override
   public void initialize() throws MessageGeneratorInitializationException {
-    MessageSchemaLoader schemaLoader = new MessageSchemaLoader(schemaFileUri);
+    MessageSchemaLoader schemaLoader = new MessageSchemaLoader(schemaFilePath);
     this.schema = schemaLoader.loadMessageSchema();
   }
 
@@ -36,7 +36,7 @@ public class SchemaBasedMessageGenerator implements MessageGenerator {
     }
     try {
       return new ObjectMapper().writeValueAsString(targetJsonAsMap);
-    } catch (JsonProcessingException ex) {
+    } catch (JacksonException ex) {
       throw new RuntimeException("Cannot marshal object to json", ex);
     }
   }
