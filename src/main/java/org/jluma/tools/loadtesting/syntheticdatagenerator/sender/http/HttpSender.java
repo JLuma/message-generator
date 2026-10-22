@@ -2,38 +2,50 @@ package org.jluma.tools.loadtesting.syntheticdatagenerator.sender.http;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.hc.client5.http.classic.HttpClient;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPatch;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
 import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
 import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
-import org.apache.hc.core5.http.*;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.http.message.BasicHeader;
-import org.apache.hc.core5.http.protocol.BasicHttpContext;
 import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.util.TimeValue;
+import org.apache.hc.core5.util.Timeout;
 import org.jluma.tools.loadtesting.syntheticdatagenerator.api.MessageSender;
 import org.jluma.tools.loadtesting.syntheticdatagenerator.config.SenderProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
+import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
@@ -41,86 +53,42 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class HttpSender implements MessageSender {
 
-    private static final int ASYNC_THREADS = 20;
     private static final TimeValue DEFAULT_KEEP_ALIVE = TimeValue.ofSeconds(30);
+    private static final TimeValue IDLE_EVICTION_PERIOD = TimeValue.ofSeconds(15);
+    private static final Timeout CONNECT_TIMEOUT = Timeout.ofSeconds(5);
+    private static final int MAX_LOGGED_BODY_LENGTH = 1000;
 
     private final SenderProperties senderProperties;
 
-    private HttpClient httpClient;
-    private ExecutorService executorService;
+    /** Один клиент на весь жизненный цикл отправителя. Закрывается только в close(). */
+    private CloseableHttpClient httpClient;
     private HttpHost targetHost;
-    private URI targetUri;
+    private String requestPath;
     private String httpMethod;
     private Header[] requestHeaders;
+    private String url;
     private volatile boolean initialized = false;
 
     @Override
-    public void initialize() {
+    public synchronized void initialize() {
         if (initialized) {
             log.warn("HttpSender already initialized");
             return;
         }
 
-        try {
-            SenderProperties.HttpProps httpProps = senderProperties.getHttp();
-            String url = httpProps.getUrl();
+        SenderProperties.HttpProps httpProps = senderProperties.getHttp();
+        url = httpProps.getUrl();
 
-            // Parse URL to extract scheme, host, port, path
-            int schemeEnd = url.indexOf("://");
-            if (schemeEnd == -1) {
-                throw new IllegalArgumentException("Invalid URL: " + url);
-            }
-            String scheme = url.substring(0, schemeEnd);
-            String remainder = url.substring(schemeEnd + 3);
+        URI uri = parseUrl(url);
+        // Порт -1 означает «по умолчанию для схемы»: клиент сам подставит 80 или 443
+        targetHost = new HttpHost(uri.getScheme(), uri.getHost(), uri.getPort());
+        requestPath = buildRequestPath(uri);
+        httpMethod = resolveMethod(httpProps.getMethod());
+        requestHeaders = buildHeaders(httpProps.getHeaders());
+        httpClient = createHttpClient(httpProps);
 
-            int hostEnd = remainder.indexOf("/");
-            String authority;
-            String path;
-            if (hostEnd != -1) {
-                authority = remainder.substring(0, hostEnd);
-                path = remainder.substring(hostEnd);
-            } else {
-                authority = remainder;
-                path = "/";
-            }
-
-            int portIdx = authority.indexOf(":");
-            int port;
-            String host;
-            if (portIdx != -1) {
-                host = authority.substring(0, portIdx);
-                port = Integer.parseInt(authority.substring(portIdx + 1));
-            } else {
-                host = authority;
-                port = "https".equalsIgnoreCase(scheme) ? 443 : 80;
-            }
-
-            targetHost = new HttpHost(scheme, host, port);
-            targetUri = URI.create(path);
-            httpMethod = httpProps.getMethod().toUpperCase();
-
-            // Build request headers
-            Map<String, String> headers = httpProps.getHeaders();
-            if (headers != null && !headers.isEmpty()) {
-                requestHeaders = headers.entrySet().stream()
-                        .map(e -> new BasicHeader(e.getKey(), e.getValue()))
-                        .toArray(Header[]::new);
-            } else {
-                requestHeaders = new Header[0];
-            }
-
-            // Create connection pool and HTTP client
-            httpClient = createHttpClient();
-
-            // Initialize async execution service for handling HTTP requests
-            executorService = Executors.newFixedThreadPool(ASYNC_THREADS);
-
-            initialized = true;
-            log.info("HttpSender initialized for URL: {} with method: {}", url, httpMethod);
-        } catch (Exception e) {
-            log.error("Failed to initialize HttpSender", e);
-            throw new RuntimeException("Failed to initialize HttpSender", e);
-        }
+        initialized = true;
+        log.info("HttpSender initialized for URL: {} with method: {}", url, httpMethod);
     }
 
     @Override
@@ -129,164 +97,26 @@ public class HttpSender implements MessageSender {
             throw new IllegalStateException("HttpSender not initialized. Call initialize() first.");
         }
 
+        CloseableHttpClient client = httpClient;
+        ClassicHttpRequest request = buildRequest(message);
         try {
-            // Use async execution for better throughput under high RPS
-            Future<?> future = executorService.submit(() -> sendRequest(message));
-            // Wait for completion with timeout
-            future.get(senderProperties.getHttp().getSocketTimeoutMillis(), TimeUnit.MILLISECONDS);
-        } catch (Exception e) {
-            log.error("Failed to send message via HTTP", e);
-            throw new RuntimeException("Failed to send message via HTTP", e);
-        }
-    }
-
-    private void sendRequest(String message) {
-        try {
-            switch (httpMethod) {
-                case "POST" -> executePost(message);
-                case "PUT" -> executePut(message);
-                case "PATCH" -> executePatch(message);
-                case "GET" -> executeGet(message);
-                default -> executePost(message);
-            }
-        } catch (Exception e) {
-            log.error("HTTP request failed for URL: {}", senderProperties.getHttp().getUrl(), e);
-            throw new RuntimeException("HTTP request failed", e);
-        }
-    }
-
-    private void executePost(String message) throws Exception {
-        HttpPost httpRequest = new HttpPost(targetUri);
-        httpRequest.setHeaders(requestHeaders);
-        httpRequest.setEntity(new StringEntity(message, ContentType.APPLICATION_JSON));
-        executeRequest(httpRequest);
-    }
-
-    private void executePut(String message) throws Exception {
-        HttpPut httpRequest = new HttpPut(targetUri);
-        httpRequest.setHeaders(requestHeaders);
-        httpRequest.setEntity(new StringEntity(message, ContentType.APPLICATION_JSON));
-        executeRequest(httpRequest);
-    }
-
-    private void executePatch(String message) throws Exception {
-        HttpPatch httpRequest = new HttpPatch(targetUri);
-        httpRequest.setHeaders(requestHeaders);
-        httpRequest.setEntity(new StringEntity(message, ContentType.APPLICATION_JSON));
-        executeRequest(httpRequest);
-    }
-
-    private void executeGet(String message) throws Exception {
-        URI uri = targetUri;
-        // For GET, append message as query parameter if needed
-        if (message != null && !message.isEmpty()) {
-            String encoded = URLEncoder.encode(message, StandardCharsets.UTF_8);
-            String existingQuery = targetUri.getQuery();
-            String newQuery = existingQuery != null ? existingQuery + "&message=" + encoded : "message=" + encoded;
-            uri = new URI(
-                    targetUri.getScheme(),
-                    targetUri.getAuthority(),
-                    targetUri.getPath(),
-                    newQuery,
-                    targetUri.getFragment()
-            );
-        }
-
-        HttpGet httpRequest = new HttpGet(uri);
-        httpRequest.setHeaders(requestHeaders);
-        executeRequest(httpRequest);
-    }
-
-    private void executeRequest(ClassicHttpRequest httpRequest) throws Exception {
-        try (CloseableHttpClient client = (CloseableHttpClient) httpClient) {
-            org.apache.hc.core5.http.ClassicHttpResponse response =
-                    client.execute(targetHost, httpRequest, new BasicHttpContext());
-            processResponse(response);
-        }
-    }
-
-    private void processResponse(org.apache.hc.core5.http.ClassicHttpResponse response) throws Exception {
-        int statusCode = response.getCode();
-        HttpEntity entity = response.getEntity();
-
-        if (statusCode >= 200 && statusCode < 300) {
-            // Success - don't consume entity to save resources
-        } else if (entity != null) {
-            String responseBody = EntityUtils.toString(entity);
-            if (statusCode >= 500) {
-                log.error("HTTP server error {} from {}: {}", statusCode, senderProperties.getHttp().getUrl(), responseBody);
-            } else {
-                log.warn("HTTP client error {} from {}: {}", statusCode, senderProperties.getHttp().getUrl(), responseBody);
-            }
-            EntityUtils.consume(entity);
-        } else {
-            if (statusCode >= 500) {
-                log.error("HTTP server error {} from {}", statusCode, senderProperties.getHttp().getUrl());
-            } else {
-                log.warn("HTTP client error {} from {}", statusCode, senderProperties.getHttp().getUrl());
-            }
-        }
-    }
-
-    private HttpClient createHttpClient() {
-        try {
-            // Create trust-all SSL context for simplicity
-            SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(null, new javax.net.ssl.TrustManager[]{
-                    new javax.net.ssl.X509TrustManager() {
-                        public java.security.cert.X509Certificate[] getAcceptedIssuers() { return null; }
-                        public void checkClientTrusted(java.security.cert.X509Certificate[] certs, String authType) {}
-                        public void checkServerTrusted(java.security.cert.X509Certificate[] certs, String authType) {}
-                    }
-            }, new java.security.SecureRandom());
-
-            SSLConnectionSocketFactory sslSocketFactory = new SSLConnectionSocketFactory(sslContext);
-
-            // Build connection pool manager - key for high RPS performance
-            ConnectionConfig defaultConfig = ConnectionConfig.custom()
-                    .setTimeToLive(TimeValue.ofMilliseconds(senderProperties.getHttp().getTimeToLiveMillis()))
-                    .build();
-
-            PoolingHttpClientConnectionManager connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
-                    .setSSLSocketFactory(sslSocketFactory)
-                    .setDefaultConnectionConfig(defaultConfig)
-                    .setMaxConnTotal(senderProperties.getHttp().getMaxTotalConnections())
-                    .setMaxConnPerRoute(senderProperties.getHttp().getDefaultMaxPerRoute())
-                    .build();
-
-            // Create the HTTP client with proper timeouts and connection management
-            return HttpClients.custom()
-                    .setConnectionManager(connectionManager)
-                    .setConnectionManagerShared(false)
-                    .setKeepAliveStrategy((response, context) -> DEFAULT_KEEP_ALIVE)
-                    .evictIdleConnections(TimeValue.ofSeconds(15))
-                    .evictExpiredConnections()
-                    .build();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to create HttpClient", e);
+            // Вызов с обработчиком ответа: клиент сам дочитает тело, закроет ответ
+            // и вернёт соединение в пул, даже если обработчик бросит исключение
+            client.execute(targetHost, request, response -> {
+                processResponse(response);
+                return null;
+            });
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to send message via HTTP to " + url, e);
         }
     }
 
     @Override
     public synchronized void close() {
-        try {
-            if (executorService != null && !executorService.isShutdown()) {
-                executorService.shutdown();
-                if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
-                    executorService.shutdownNow();
-                }
-            }
-
-            if (httpClient instanceof CloseableHttpClient) {
-                ((CloseableHttpClient) httpClient).close(CloseMode.GRACEFUL);
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            if (httpClient instanceof CloseableHttpClient) {
-                ((CloseableHttpClient) httpClient).close(CloseMode.GRACEFUL);
-            }
-        }
         initialized = false;
+        if (httpClient != null) {
+            httpClient.close(CloseMode.GRACEFUL);
+        }
         log.info("HttpSender closed");
     }
 
@@ -295,4 +125,183 @@ public class HttpSender implements MessageSender {
         return true;
     }
 
+    // ---------------------------------------------------------------------
+    // Построение запроса
+    // ---------------------------------------------------------------------
+
+    private ClassicHttpRequest buildRequest(String message) {
+        String body = message != null ? message : "";
+
+        ClassicHttpRequest request = switch (httpMethod) {
+            case "GET" -> new HttpGet(appendMessageQuery(body));
+            case "PUT" -> new HttpPut(requestPath);
+            case "PATCH" -> new HttpPatch(requestPath);
+            default -> new HttpPost(requestPath);
+        };
+
+        request.setHeaders(requestHeaders);
+        if (!"GET".equals(httpMethod)) {
+            request.setEntity(new StringEntity(body, ContentType.APPLICATION_JSON));
+        }
+        return request;
+    }
+
+    /** Для GET сообщение передаётся параметром запроса message. */
+    private String appendMessageQuery(String message) {
+        if (message.isEmpty()) {
+            return requestPath;
+        }
+        String encoded = URLEncoder.encode(message, StandardCharsets.UTF_8);
+        String separator = requestPath.contains("?") ? "&" : "?";
+        return requestPath + separator + "message=" + encoded;
+    }
+
+    // ---------------------------------------------------------------------
+    // Обработка ответа
+    // ---------------------------------------------------------------------
+
+    private void processResponse(ClassicHttpResponse response) throws IOException, ParseException {
+        int statusCode = response.getCode();
+        if (statusCode >= 200 && statusCode < 300) {
+            // Тело успешного ответа дочитает и освободит сам execute()
+            return;
+        }
+
+        HttpEntity entity = response.getEntity();
+        String body = entity != null ? truncate(EntityUtils.toString(entity)) : "";
+
+        if (statusCode >= 500) {
+            log.error("HTTP server error {} from {}: {}", statusCode, url, body);
+        } else {
+            log.warn("HTTP error {} from {}: {}", statusCode, url, body);
+        }
+    }
+
+    private static String truncate(String body) {
+        if (body == null || body.length() <= MAX_LOGGED_BODY_LENGTH) {
+            return body;
+        }
+        return body.substring(0, MAX_LOGGED_BODY_LENGTH) + "... (truncated, " + body.length() + " chars)";
+    }
+
+    // ---------------------------------------------------------------------
+    // Разбор настроек
+    // ---------------------------------------------------------------------
+
+    private static URI parseUrl(String url) {
+        if (url == null || url.isBlank()) {
+            throw new IllegalArgumentException("HTTP sender URL is not set");
+        }
+
+        URI uri;
+        try {
+            uri = new URI(url.trim());
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException("Invalid URL: " + url, e);
+        }
+
+        String scheme = uri.getScheme();
+        if (scheme == null || !("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))) {
+            throw new IllegalArgumentException("URL must start with http:// or https://: " + url);
+        }
+        if (uri.getHost() == null) {
+            throw new IllegalArgumentException("URL has no host: " + url);
+        }
+        return uri;
+    }
+
+    private static String buildRequestPath(URI uri) {
+        String path = uri.getRawPath();
+        if (path == null || path.isEmpty()) {
+            path = "/";
+        }
+        String query = uri.getRawQuery();
+        return query != null ? path + "?" + query : path;
+    }
+
+    private static String resolveMethod(String method) {
+        if (method == null || method.isBlank()) {
+            return "POST";
+        }
+        String normalized = method.trim().toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "POST", "PUT", "PATCH", "GET" -> normalized;
+            default -> {
+                log.warn("Unsupported HTTP method '{}', falling back to POST", method);
+                yield "POST";
+            }
+        };
+    }
+
+    private static Header[] buildHeaders(Map<String, String> headers) {
+        if (headers == null || headers.isEmpty()) {
+            return new Header[0];
+        }
+        return headers.entrySet().stream()
+                .map(e -> new BasicHeader(e.getKey(), e.getValue()))
+                .toArray(Header[]::new);
+    }
+
+    // ---------------------------------------------------------------------
+    // HTTP-клиент
+    // ---------------------------------------------------------------------
+
+    private static CloseableHttpClient createHttpClient(SenderProperties.HttpProps props) {
+        Timeout socketTimeout = Timeout.ofMilliseconds(props.getSocketTimeoutMillis());
+
+        ConnectionConfig connectionConfig = ConnectionConfig.custom()
+                .setConnectTimeout(CONNECT_TIMEOUT)
+                .setSocketTimeout(socketTimeout)
+                .setTimeToLive(TimeValue.ofMilliseconds(props.getTimeToLiveMillis()))
+                .build();
+
+        PoolingHttpClientConnectionManager connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
+                .setSSLSocketFactory(createTrustAllSocketFactory())
+                .setDefaultConnectionConfig(connectionConfig)
+                .setMaxConnTotal(props.getMaxTotalConnections())
+                .setMaxConnPerRoute(props.getDefaultMaxPerRoute())
+                .build();
+
+        // Сколько ждать свободное соединение из пула, прежде чем упасть с ошибкой
+        RequestConfig requestConfig = RequestConfig.custom()
+                .setConnectionRequestTimeout(socketTimeout)
+                .build();
+
+        return HttpClients.custom()
+                .setConnectionManager(connectionManager)
+                .setDefaultRequestConfig(requestConfig)
+                .setKeepAliveStrategy((response, context) -> DEFAULT_KEEP_ALIVE)
+                .evictIdleConnections(IDLE_EVICTION_PERIOD)
+                .evictExpiredConnections()
+                .build();
+    }
+
+    /**
+     * Доверяет любым сертификатам и не проверяет имя хоста.
+     * Допустимо только для нагрузочного стенда, не для продакшна.
+     */
+    private static SSLConnectionSocketFactory createTrustAllSocketFactory() {
+        try {
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, new TrustManager[]{
+                    new X509TrustManager() {
+                        @Override
+                        public X509Certificate[] getAcceptedIssuers() {
+                            return new X509Certificate[0];
+                        }
+
+                        @Override
+                        public void checkClientTrusted(X509Certificate[] certs, String authType) {
+                        }
+
+                        @Override
+                        public void checkServerTrusted(X509Certificate[] certs, String authType) {
+                        }
+                    }
+            }, new SecureRandom());
+            return new SSLConnectionSocketFactory(sslContext, NoopHostnameVerifier.INSTANCE);
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("Failed to create trust-all SSL context", e);
+        }
+    }
 }
