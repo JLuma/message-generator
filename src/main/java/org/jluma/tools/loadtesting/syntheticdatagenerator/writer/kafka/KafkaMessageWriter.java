@@ -1,5 +1,6 @@
 package org.jluma.tools.loadtesting.syntheticdatagenerator.writer.kafka;
 
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -31,6 +32,17 @@ public class KafkaMessageWriter implements MessageWriter {
     this.bootstrapServers = conf.getKafkaServersProperty();
     this.throttlingDelay = conf.getThrottlingDelay();
 
+    // Extract Kafka producer additional properties with prefix "native.kafka."
+    Properties props = conf.getConfAsProperties();
+    final String kafkaPropertiesNamePrefix = "native.kafka.";
+    for (Map.Entry<Object, Object> e : props.entrySet()) {
+      String propertyName = (String) e.getKey();
+      if (propertyName.startsWith(kafkaPropertiesNamePrefix)) {
+        String targetPropertyName = propertyName.replace(kafkaPropertiesNamePrefix, "");
+        kafkaProducerAdditionalProperties.put(targetPropertyName, e.getValue());
+      }
+    }
+
     LOG.info("Starting with configuration:\n" +
                  "Topic [{}]\n" +
                  "Bootstrap servers [{}]\n" +
@@ -55,10 +67,6 @@ public class KafkaMessageWriter implements MessageWriter {
 
     LOG.info("Execution time {} (ms)", (System.currentTimeMillis() - startTime));
     es.shutdown();
-  }
-
-  public void addKafkaProducerAdditionalProperties(Properties properties) {
-    this.kafkaProducerAdditionalProperties.putAll(properties);
   }
 
   private void sendToKafka(

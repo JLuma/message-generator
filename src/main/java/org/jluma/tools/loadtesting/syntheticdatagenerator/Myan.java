@@ -3,7 +3,6 @@ package org.jluma.tools.loadtesting.syntheticdatagenerator;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.Map;
 import java.util.Properties;
 
 import org.apache.commons.lang3.StringUtils;
@@ -57,9 +56,6 @@ public class Myan {
             writeSample(messageGenerator);
         } else {
             MessageWriter messageWriter = constructMessageWriter();
-            if (messageWriter instanceof KafkaMessageWriter kafkaWriter) {
-                kafkaWriter.addKafkaProducerAdditionalProperties(getKafkaProducerAdditionalProperties());
-            }
             messageWriter.writeMessages(messageGenerator);
         }
     }
@@ -94,20 +90,6 @@ public class Myan {
             fos.write(sampleMessage.getBytes());
         }
         System.out.println(sampleMessage);
-    }
-
-    private Properties getKafkaProducerAdditionalProperties() {
-        Properties props = conf.getConfAsProperties();
-        Properties kafkaProducerAdditionalProperties = new Properties();
-        final String kafkaPropertiesNamePrefix = "native.kafka.";
-        for (Map.Entry<Object, Object> e : props.entrySet()) {
-            String propertyName = (String) e.getKey();
-            if (propertyName.startsWith(kafkaPropertiesNamePrefix)) {
-                String targetPropertyName = propertyName.replace(kafkaPropertiesNamePrefix, "");
-                kafkaProducerAdditionalProperties.put(targetPropertyName, e.getValue());
-            }
-        }
-        return kafkaProducerAdditionalProperties;
     }
 
 }
